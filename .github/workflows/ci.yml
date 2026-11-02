@@ -1,0 +1,83 @@
+# Continuous integration: every push and pull request must build in Debug and Release (all targets, including the
+# samples) and pass the formatting check. The Debug build is also run once headless on a software Vulkan driver, where
+# any validation layer message makes the program exit with code 1 (see CLAUDE.md).
+name: CI
+
+on:
+  push:
+  pull_request:
+
+env:
+  # same steps as in the README: system libraries for GLFW, then the LunarG Vulkan SDK
+  GLFW_DEPS: libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libwayland-dev libxkbcommon-dev wayland-protocols
+
+jobs:
+  format:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      # --dry-run -Werror fails if clang-format would change any file (the file list is the one from CLAUDE.md)
+      - name: Check clang-format
+        run: clang-format --dry-run -Werror src/*.cpp src/*.hpp core/*.cpp core/*.hpp core/gpu/*.cpp core/gpu/*.hpp samples/*/*.cpp samples/*/*.hpp
+
+  build-linux:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        preset: [debug, release]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake ninja-build $GLFW_DEPS
+
+      # The distribution packages (libvulkan-dev, ...) are too old: vk-bootstrap needs Vulkan headers 1.4.
+      - name: Install Vulkan SDK
+        run: |
+          mkdir -p ~/vulkansdk && cd ~/vulkansdk
+          wget -q https://sdk.lunarg.com/sdk/download/latest/linux/vulkan-sdk.tar.xz
+          tar xf vulkan-sdk.tar.xz
+          # setup-env.sh sets VULKAN_SDK, PATH (glslc), LD_LIBRARY_PATH, VK_ADD_LAYER_PATH (validation layers) and
+          # CMAKE_PREFIX_PATH (where CMake finds libvulkan, which is in lib/VulkanLoader) for one shell;
+          # export the same variables to all following steps
+          source "$(echo ~/vulkansdk/1.*/setup-env.sh)"
+          for v in VULKAN_SDK PATH LD_LIBRARY_PATH VK_ADD_LAYER_PATH CMAKE_PREFIX_PATH PKG_CONFIG_PATH; do echo "$v=${!v}" >> "$GITHUB_ENV"; done
+
+      - name: Cache FetchContent dependencies
+        uses: actions/cache@v4
+        with:
+          path: build-${{ matrix.preset }}/_deps
+          key: deps-${{ matrix.preset }}-${{ hashFiles('CMakeLists.txt', 'cmake/**') }}
+
+      - name: Configure
+        run: cmake --preset ${{ matrix.preset }} -G Ninja
+
+      - name: Build all targets
+        run: cmake --build --preset ${{ matrix.preset }}
+
+      # Run the Debug build headless: lavapipe is a CPU Vulkan driver, xvfb provides the X server for the GLFW window.
+      # Debug enables the validation layers incl. synchronization validation; the exit code is 1 if there was a message.
+      - name: Install software Vulkan driver and virtual display
+        if: matrix.preset == 'debug'
+        run: sudo apt-get install -y mesa-vulkan-drivers xvfb
+
+      - name: Capture 60 frames with validation
+        if: matrix.preset == 'debug'
+        working-directory: build-debug
+        run: |
+          export VK_DRIVER_FILES=/usr/share/vulkan/icd.d/lvp_icd.json
+          for exe in thesis-framework-vk sample-gbuffer sample-fullscreen-quad; do
+            echo "::group::$exe"
+            xvfb-run -a -s "-screen 0 1280x720x24" ./$exe --capture 60 --capture-file "capture-$exe.png"
+            echo "::endgroup::"
+          done
+
+      # the captured frames are useful to see what the software renderer produced
+      - name: Upload captured frames
+        if: matrix.preset == 'debug' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: captures
+          path: build-debug/capture-*.png
+          if-no-files-found: ignore

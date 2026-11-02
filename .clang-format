@@ -1,0 +1,77 @@
+# Code style of the framework. Most IDEs (CLion, Visual Studio, VS Code with the C/C++ or clangd extension)
+# pick this file up automatically. Format all files from the console (in the repository root) with:
+#   clang-format -i src/*.cpp src/*.hpp core/*.cpp core/*.hpp core/gpu/*.cpp core/gpu/*.hpp samples/*/*.cpp samples/*/*.hpp
+#
+# Naming conventions (not enforced by clang-format):
+#   Types (classes, structs, enums)     PascalCase          VulkanContext, FrameTarget
+#   Functions and methods               camelCase           beginFrame(), getAspectRatio()
+#   Variables and parameters            camelCase           framebufferWidth
+#   Class members (public and private)  m + PascalCase      mDevice, mColor
+#   Fields of plain data structs        camelCase           Buffer::address
+#   Constants and macros                UPPER_SNAKE_CASE    DEPTH_FORMAT, VK_CHECK
+#   Files                               snake_case          vulkan_context.cpp
+#
+# Comments (not enforced by clang-format):
+#   ///   documents a declaration in a header (class, function, member), placed directly above it. IDEs show these
+#         comments on hover, and Doxygen can generate documentation from them.
+#   ///<  documents a struct field on the same line, for short notes
+#   //    explains the implementation in .cpp files: why something is done, or how it works
+---
+Language: Cpp
+BasedOnStyle: LLVM
+Standard: c++20
+
+# indentation
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+AccessModifierOffset: -4
+IndentCaseLabels: true
+NamespaceIndentation: None
+IndentPPDirectives: None
+
+# line breaks
+ColumnLimit: 120
+# braces on their own line (Allman style), except for lambdas and namespaces
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterCaseLabel: true
+  AfterClass: true
+  AfterControlStatement: Always
+  AfterEnum: true
+  AfterFunction: true
+  AfterNamespace: false
+  AfterStruct: true
+  AfterUnion: true
+  AfterExternBlock: true
+  BeforeCatch: true
+  BeforeElse: true
+  BeforeLambdaBody: false
+  BeforeWhile: false
+  IndentBraces: false
+  SplitEmptyFunction: false
+  SplitEmptyRecord: false
+  SplitEmptyNamespace: false
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortLambdasOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortBlocksOnASingleLine: Never
+AllowShortCaseLabelsOnASingleLine: true
+AlwaysBreakTemplateDeclarations: Yes
+BreakBeforeBinaryOperators: NonAssignment
+BreakConstructorInitializers: BeforeColon
+PackConstructorInitializers: NextLine
+MaxEmptyLinesToKeep: 1
+KeepEmptyLinesAtTheStartOfBlocks: false
+InsertNewlineAtEOF: true
+
+# spacing and alignment
+PointerAlignment: Left
+SpaceAfterCStyleCast: false
+AlignTrailingComments: true
+AlignAfterOpenBracket: Align
+
+# includes are sorted within blocks separated by empty lines
+SortIncludes: CaseSensitive
+IncludeBlocks: Preserve
