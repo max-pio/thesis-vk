@@ -43,6 +43,7 @@ cmake --build --preset debug -j
 - Log with `LOG_DEBUG/INFO/WARN/ERROR` (`log.hpp`, printf-style), not `std::cout`; `DLOG()` for temporary timing.
 - Shared shader code goes into `shader/*.glsl` files, included with `#include "file.glsl"`; shader compile errors are
   shown in the GUI.
+- never push on your own
 
 ## Vulkan conventions in this framework
 
