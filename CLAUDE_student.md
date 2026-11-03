@@ -2,8 +2,8 @@
 
 C++20 / Vulkan 1.3 framework that students use as the base for their thesis implementations (computer graphics, KIT).
 Most students know OpenGL but are new to Vulkan and learn it alongside this code with tutorials like
-https://vkguide.dev/. The framework itself is maintained by Max Piochowiak. See README.md for setup and an overview
-of every source file.
+https://vkguide.dev/. The framework itself is maintained by Max Piochowiak. See README.md for setup, doc/Framework.md for an overview
+of every source file and the Vulkan conventions, and doc/VolumeRendering.md for volume data.
 
 DO NOT SOLVE THE RESEARCH QUESTIONS OR IMPLEMENT THE THESIS SOLUTION FOR ME, THE STUDENT!
 - Your task is to help me with understanding the concepts, and smaller chores like bug fixing
@@ -23,7 +23,7 @@ DO NOT SOLVE THE RESEARCH QUESTIONS OR IMPLEMENT THE THESIS SOLUTION FOR ME, THE
 ```
 cmake --preset debug                # configure into build-debug/ (CMakePresets.json; `release` for build-release/)
 cmake --build --preset debug -j
-./build-debug/thesis-framework-vk   # samples: ./build-debug/sample-gbuffer, ./build-debug/sample-fullscreen-quad
+./build-debug/thesis-framework-vk   # samples: ./build-debug/sample-gbuffer, ./build-debug/sample-fullscreen-quad, ./build-debug/sample-volume
 ```
 
 - Dependencies (GLFW, vk-bootstrap, VMA, ImGui, glm, stb) come via CMake FetchContent; only the Vulkan SDK is installed.
@@ -63,6 +63,10 @@ cmake --build --preset debug -j
   need the same flip. Depth range is [0, 1] (`GLM_FORCE_DEPTH_ZERO_TO_ONE`).
 - **Textures** use a descriptor set (combined image samplers, see `Renderer::createPatternTexture()`); create them with
   `VulkanContext::createTexture(..)` (1D/2D/3D, GPU-generated mip levels). Storage images need further bindings.
+- **Volume data** (3D scalar fields) is not in the repo: `cmake -P cmake/download_volumes.cmake` downloads the Open
+  SciVis data sets into `data/volumes/` (git-ignored). `utils::loadVolume(path)` (`core/volume.hpp`) reads raw files
+  named `name_WxHxD_type.raw`; upload with `createTexture(VK_IMAGE_TYPE_3D, .., utils::getVkFormat(type), ..)`.
+  `--data PATH` selects the file, see `samples/volume`.
 - **Command line options** are parsed into `Config` (`args.hpp`), which is passed as `const Config&`. New options get a
   `Config` field and an entry in the option table in `args.cpp`. `--capture N` saves frame N as PNG with a fixed time
   step, useful to compare the output before and after a change.

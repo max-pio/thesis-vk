@@ -2,8 +2,8 @@
 
 C++20 / Vulkan 1.3 framework that students use as the base for their thesis implementations (computer graphics, KIT).
 Most students know OpenGL but are new to Vulkan and learn it alongside this code with tutorials like
-https://vkguide.dev/. The framework itself is maintained by Max Piochowiak. See README.md for setup and an overview
-of every source file.
+https://vkguide.dev/. The framework itself is maintained by Max Piochowiak. See README.md for setup, doc/Framework.md for an overview
+of every source file and the Vulkan conventions, and doc/VolumeRendering.md for volume data.
 
 ## Working with students
 
@@ -19,7 +19,7 @@ of every source file.
 ```
 cmake --preset debug                # configure into build-debug/ (CMakePresets.json; `release` for build-release/)
 cmake --build --preset debug -j
-./build-debug/thesis-framework-vk   # samples: ./build-debug/sample-gbuffer, ./build-debug/sample-fullscreen-quad
+./build-debug/thesis-framework-vk   # samples: ./build-debug/sample-gbuffer, ./build-debug/sample-fullscreen-quad, ./build-debug/sample-volume
 ```
 
 - Dependencies (GLFW, vk-bootstrap, VMA, ImGui, glm, stb) come via CMake FetchContent; only the Vulkan SDK is installed.
@@ -60,6 +60,10 @@ cmake --build --preset debug -j
   need the same flip. Depth range is [0, 1] (`GLM_FORCE_DEPTH_ZERO_TO_ONE`).
 - **Textures** use a descriptor set (combined image samplers, see `Renderer::createPatternTexture()`); create them with
   `VulkanContext::createTexture(..)` (1D/2D/3D, GPU-generated mip levels). Storage images need further bindings.
+- **Volume data** (3D scalar fields) is not in the repo: `cmake -P cmake/download_volumes.cmake` downloads the Open
+  SciVis data sets into `data/volumes/` (git-ignored). `utils::loadVolume(path)` (`core/volume.hpp`) reads raw files
+  named `name_WxHxD_type.raw`; upload with `createTexture(VK_IMAGE_TYPE_3D, .., utils::getVkFormat(type), ..)`.
+  `--data PATH` selects the file, see `samples/volume`.
 - **Command line options** are parsed into `Config` (`args.hpp`), which is passed as `const Config&`. New options get a
   `Config` field and an entry in the option table in `args.cpp`. `--capture N` saves frame N as PNG with a fixed time
   step, useful to compare the output before and after a change.
@@ -100,6 +104,8 @@ everything. Be explicit and explain every barrier you add or suggest.
   file names.
 - Comments: `///` above declarations in headers, `///<` for short struct field notes, `//` in `.cpp` files to explain
   why. Comment density is high on purpose because students read this code to learn Vulkan; match it.
-- New source and shader files start with the same two-line MIT license header as the existing files (`//` comments,
-  in shaders above `#version`):
+- Files that belong to the framework itself (`core/`, the framework's `samples/`, shared shaders) start with the
+  two-line MIT license header of the existing files (`//` comments, in shaders above `#version`):
   `Copyright (c) 2026 Max Piochowiak, Karlsruhe Institute of Technology` and `SPDX-License-Identifier: MIT`.
+  Do not add it to a student's own files: students own the copyright of their implementation, they decide on its
+  header and license.
