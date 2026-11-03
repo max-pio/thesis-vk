@@ -11,6 +11,7 @@ A lightweight C++20 / Vulkan 1.3 project setup. Questions or suggestions: [max.p
 * [Project Structure](#project-structure)
 * [Samples](#samples)
 * [Vulkan Concepts](#vulkan-concepts-used-in-the-framework)
+* [Volume Data](#volume-data)
 * [Debugging](#debugging)
 * [License](#license)
 
@@ -152,25 +153,14 @@ The project defines a simple render loop with an example GUI. Extend it with you
 
 ## Project Structure
 
-The default project renders instanced cubes with a GUI color and a texture on their faces. `src/` is your starting point (main loop and renderer); `core/` is the framework library that you usually only extend.
+The default project renders instanced cubes with a GUI color and a texture on their faces. `src/` is your starting point (main loop and renderer); `core/` is the framework library that you usually only extend. The files of `core/`, the frame loop and the Vulkan features the framework uses are explained in [doc/Framework.md](doc/Framework.md).
 
 * `src/main.cpp`: parses options, creates the GLFW window, initializes Vulkan and ImGui, runs the main loop and defines the GUI elements
 * `src/renderer.cpp`: initializes (before the main loop), records the rendering commands (during it) and cleans up (after it)
-* `core/args.cpp`: parses command line options into `Config`
-* `core/log.cpp`: console and optional file logging
-* `core/cpu_timer.hpp`, `core/gpu/gpu_timer.cpp`: CPU and GPU timers
-* `core/results.cpp`: benchmark results as CSV
-* `core/gpu/vulkan_context.cpp`:
-  * creates the instance, device, swapchain and memory allocator
-  * per-frame synchronization (`beginFrame()` / `endFrame()`)
-  * helpers for buffers, images and textures (1D, 2D, 3D, with mip levels)
-  * frame capture
-* `core/gpu/gpu_utils.cpp`: Vulkan helpers such as `VK_CHECK(..)`, shader compilation and pipeline barriers
-* `core/gpu/vma_implementation.cpp`: compiles the Vulkan Memory Allocator
-* `core/gui.cpp`: sets up Dear ImGui and draws the GUI over the frame
-* `core/camera.cpp`: orbit camera; left mouse rotates, wheel zooms, WASD / QE move the center of rotation (horizontal / vertical)
-* `core/utils.cpp`: general helpers, e.g. saving PNGs and creating the cube texture on the CPU (OpenMP)
-* `core/volume.cpp`: loads raw 3D scalar volumes from disk (`utils::loadVolume()`, see [Volume Data](#volume-data))
+* `core/`: the shared framework (Vulkan context, helpers, camera, GUI, timers, logging, volume loader)
+* `samples/`: small example renderers (see below)
+* `doc/`: further documentation
+* `cmake/download_volumes.cmake`: downloads example volumes
 
 ## Samples
 
@@ -184,73 +174,26 @@ The default project renders instanced cubes with a GUI color and a texture on th
 * `sample-fullscreen-quad` (`samples/fullscreen-quad/`): the smallest possible renderer, a fullscreen quad that shows its uv coordinates as color, tinted with a GUI color.
   * one pipeline that renders directly into the swapchain image, with a push constant and without buffers, descriptor sets or barriers: a minimal starting point for image-space techniques
 
-* `sample-volume` (`samples/volume/`): loads a raw 3D scalar volume from disk and renders it with a ray marcher in a fragment shader (see [Volume Data](#volume-data)).
+* `sample-volume` (`samples/volume/`): loads a raw 3D scalar volume from disk and renders it with a ray marcher in a fragment shader (see [doc/VolumeRendering.md](doc/VolumeRendering.md)).
   * the volume is a 3D texture (`VK_IMAGE_TYPE_3D`) with a linear sampler; the ray is intersected with the bounding box and sampled in steps
-  * modes: direct volume rendering (emission-absorption, front-to-back compositing with early termination), maximum intensity projection and isosurface with gradient shading
+  * modes: direct volume rendering (emission-absorption, front-to-back compositing with early termination), and isosurface with gradient shading
   * the GUI sets the value window, density, iso value, sampling rate and voxel spacing, and shows the GPU time
 
 ## Volume Data
 
-Thesis topics in scientific visualization need real 3D scalar fields (CT, MRI, simulations). The framework reads **raw files** (the voxels without header, little-endian, x varies fastest) with `utils::loadVolume(path)` (`core/volume.hpp`). The grid size and the voxel type are part of the file name:
-
-* `name_WxHxD_type.raw`, e.g. `bonsai_256x256x256_uint8.raw`, with type `uint8`, `uint16`, `int16`, `float32` or `float64` (GPUs cannot filter 64 bit floats, so the loader converts `float64` to `float32` and logs a warning)
-* `name_WxHxD.raw`: the type is inferred from the file size (1 byte per voxel is `uint8`, 2 bytes `uint16`, 4 bytes `float32`, 8 bytes `float64`)
-
-The loader throws `std::runtime_error` with a readable message if the name or the file size does not fit. The result is a `Volume` with the voxels and the value range, which you upload with `VulkanContext::createTexture(VK_IMAGE_TYPE_3D, .., utils::getVkFormat(volume.type), ..)`. Integer voxels are normalized by the texture format (`uint8` to [0, 1], `int16` to [-1, 1], ..), so shaders sample floats; `Volume::minValue` / `maxValue` give the range in these units. The format has no voxel spacing: it is 1 after loading, set it yourself (see the table). `sample-volume` shows the whole path.
-
-**The volumes are not part of the repository.** Download them with the script that verifies the SHA-512 hash of each file from the web page of the collection, into `data/volumes/` (ignored by git):
+Thesis topics in scientific visualization need real 3D scalar fields (CT, MRI, simulations). `utils::loadVolume(path)` (`core/volume.hpp`) reads raw files named `name_WxHxD_type.raw`; the volumes are **not part of the repository**:
 
 ```
-cmake -P cmake/download_volumes.cmake                         # default: bonsai (16 MB)
-cmake -DVOLUMES="neghip;foot;carp" -P cmake/download_volumes.cmake
-cmake -DVOLUMES=list -P cmake/download_volumes.cmake          # lists all names
-./build-debug/sample-volume                                   # shows data/volumes/bonsai_256x256x256_uint8.raw
-./build-debug/sample-volume --volume data/volumes/carp_256x256x512_uint16.raw
+cmake -P cmake/download_volumes.cmake                         # default: bonsai (16 MB) into data/volumes/ (ignored by git)
+./build-debug/sample-volume                                   # ray marcher: DVR, MIP, isosurface
+./build-debug/sample-volume --data data/volumes/carp_256x256x512_uint16.raw
 ```
 
-The data sets come from the [Open SciVis Datasets](https://klacansky.com/open-scivis-datasets/) collection by Pavol Klacansky, which many recent papers use for their evaluation, so your results stay comparable. The collection has no single license; the data sets have different origins (e.g. volvis.org, hospitals, simulation groups). Check the acknowledgement of the data set on the web page and **cite it** (BibTeX is provided there) if you use it in your thesis. Volumes in the table can be downloaded by name with the script; all dimensions are `width x height x depth`.
-
-| Name | Size | Type | Spacing | File size | Used in |
-|---|---|---|---|---|---|
-| `neghip` | 64x64x64 | uint8 | 1x1x1 | 256 kB | tiny, for tests |
-| `bonsai` (default) | 256x256x256 | uint8 | 1x1x1 | 16 MB | classic CT, thin structures |
-| `foot`, `skull`, `aneurism` | 256x256x256 | uint8 | 1x1x1 | 16 MB each | Foot in the visibility optimization paper below |
-| `csafe_heptane` | 302x302x302 | uint8 | 1x1x1 | 26 MB | simulation, Heptane in the visibility optimization paper |
-| `mri_woman` | 256x256x109 | uint16 | 1x1x1.5 | 14 MB | MRI, only 12 bit of the 16 bit range are used |
-| `tacc_turbulence` | 256x256x256 | float32 | 1x1x1 | 64 MB | simulation, heavy-tailed values: narrow the window |
-| `carp` | 256x256x512 | uint16 | 0.78x0.39x1 | 64 MB | CT, anisotropic voxels |
-| `duct` | 193x194x1000 | float32 | 1x1x1 | 143 MB | simulation |
-| `bunny` | 512x512x361 | uint16 | 0.34x0.34x0.5 | 181 MB | CT |
-| `prone` | 512x512x463 | uint16 | 0.625x0.625x1 | 232 MB | CT (colon) |
-| `magnetic_reconnection` | 512x512x512 | float32 | 1x1x1 | 512 MB | simulation, in the visibility optimization paper |
-| `chameleon` | 1024x1024x1080 | uint16 | 0.092x0.092x0.105 | 2.1 GB | CT, in both papers below; the GPU needs the memory for the 3D texture |
-
-Volumes from the literature that you can compare with: Chameleon, Heptane, Foot and Magnetic Reconnection (Open SciVis names) are evaluation data sets of [View-Dependent Visibility Optimization for Monte Carlo Volume Visualization (Lerzer and Dachsbacher, Eurographics 2025)](https://cg.ivd.kit.edu/publications/2025/mc-visibility-opt/paper_mc-vis-opt.pdf); Chameleon is also used by [Real-Time Denoising of Volumetric Path Tracing for Direct Volume Rendering (Iglesias-Guitian et al.)](https://arxiv.org/pdf/2106.08034), which additionally uses Manix, Heloderma and Dragon (not part of the collection). `sample-volume` maps the x, y and z axes of the file to the world axes with +y up. Upright data sets like the bonsai look right, but CT and MRI scans are usually stored with the patient's long axis along z, so they appear rotated (`mri_woman` is seen from above): rotate the volume in your own renderer.
-
-Larger volumes of the collection (up to 256 GB) are listed on its web page; they need a streaming or bricked approach and are beyond what the loader (reads the whole file into memory) is meant for.
+[doc/VolumeRendering.md](doc/VolumeRendering.md) describes the file format, the data sets of the download script, other sources of data (OsiriX, TCIA, ..), converting DICOM, the papers to compare with and literature.
 
 ## Vulkan Concepts used in the Framework
 
-Modern Vulkan features remove a lot of boilerplate:
-
-* **Dynamic rendering**: no `VkRenderPass` / `VkFramebuffer`; start rendering with `vkCmdBeginRendering(..)`.
-* **Unified image layouts**: all images stay in `VK_IMAGE_LAYOUT_GENERAL`.
-  * Images go from `UNDEFINED` to `GENERAL` before their first use. Render targets that are overwritten every frame (e.g. depth buffers) do this every frame, which tells the GPU that the old content can be discarded.
-  * Swapchain images go to `PRESENT_SRC_KHR` for presentation (`VulkanContext::endFrame()`).
-  * You still need barriers whenever a command reads data that a previous command wrote, or overwrites data that a previous command read: `utils::imageBarrier(..)` with `GENERAL` -> `GENERAL` for images, `utils::memoryBarrier(..)` for buffers.
-* **Buffer device addresses**: shaders read buffers through pointers (`GL_EXT_buffer_reference`) passed in push constants, so buffers need no descriptor sets. With the scalar block layout (`GL_EXT_scalar_block_layout`) shader structs match C++ structs, e.g. `vec3` is 12 bytes.
-* **Y-axis points down**: Vulkan's clip space y points down, OpenGL's and glm's up.
-  * `Camera::getViewToProjectionSpace()` flips y (`projection[1][1] *= -1`), so NDC, `gl_FragCoord`, texture coordinates and images all have their origin top left with y down. This is also the convention of screen space techniques like TAA motion vectors.
-  * Counter-clockwise triangles are still front faces.
-  * Flip y in your own glm projection matrices too.
-* **Textures and descriptor sets**: textures cannot use buffer addresses; they are bound with a descriptor set (`layout(set = 0, binding = ..)`), see `Renderer::createPatternTexture()`. `VulkanContext::createTexture(..)` creates 1D / 2D / 3D textures and their mip levels.
-* **Per-frame data**: up to two frames run at once (`VulkanContext::FRAMES_IN_FLIGHT`).
-  * Data the CPU writes every frame (e.g. the animated cube positions) needs one buffer per frame in flight, or the CPU overwrites data the GPU still reads.
-  * Small data can go into push constants, which are copied into the command buffer.
-* **One-time GPU work**: `VulkanContext::immediateSubmit(..)` records commands into its own command buffer, submits it and **waits until the GPU has finished** (`vkQueueSubmit` + fence wait). Use it for setup only, e.g. uploads and mip level generation in `init()`. Do not call it every frame: the CPU stalls until the GPU is idle, so CPU and GPU no longer work in parallel. Per-frame work belongs into the command buffer that `runFrame(..)` receives, which is submitted once per frame by `VulkanContext::endFrame()`.
-* **Extensions and features**: the renderer adds its own via three static hooks, `Renderer::configureInstance`, `configureGpu` and `configureDevice` (`ContextHooks`), which receive the [vk-bootstrap](https://github.com/charles-lunarg/vk-bootstrap/blob/main/docs/getting_started.md) builders. Anything added in `configureGpu` is required (GPUs without it are rejected), anything enabled in `configureDevice` is optional; check afterwards with `VulkanContext::isDeviceExtensionEnabled(..)`. This way `VulkanContext` stays the same for all renderers and samples.
-* **Vertex pulling**: the vertex shader reads vertices from a buffer with `gl_VertexIndex`, no vertex attributes.
-* **Compute shaders**: create a compute pipeline with `vkCreateComputePipelines(..)` and the same pipeline layout approach.
+Dynamic rendering, a single image layout, buffer device addresses, the y-down convention, descriptor sets for textures and frames in flight are described in [doc/Framework.md](doc/Framework.md#vulkan-concepts-used-in-the-framework).
 
 ## Debugging
 
@@ -259,4 +202,4 @@ Modern Vulkan features remove a lot of boilerplate:
 
 ## License
 
-The framework is licensed under the [MIT license](LICENSE), `Copyright (c) 2026 Max Piochowiak, Karlsruhe Institute of Technology`. Every source and shader file starts with the short header `// Copyright (c) 2026 Max Piochowiak, Karlsruhe Institute of Technology` + `// SPDX-License-Identifier: MIT`; use the same header in new files. You can build your thesis code on it and publish it under a license of your choice, as long as the copyright and license notice of the framework are kept. The dependencies keep their own licenses (listed under [Dependencies](#dependencies)); CMake downloads them, they are not part of this repository.
+The framework is licensed under the [MIT license](LICENSE), `Copyright (c) 2026 Max Piochowiak, Karlsruhe Institute of Technology`. The files of the framework start with the short header `// Copyright (c) 2026 Max Piochowiak, Karlsruhe Institute of Technology` + `// SPDX-License-Identifier: MIT`. Keep it in these files. The code you write for your thesis is yours: you own the copyright, put your own header (or none) into your new files and publish them under a license of your choice, as long as the copyright and license notice of the framework stay in the framework's files. The dependencies keep their own licenses (listed under [Dependencies](#dependencies)); CMake downloads them, they are not part of this repository.
