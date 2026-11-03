@@ -135,6 +135,14 @@ const std::vector<Option>& getOptions()
              c.syncValidation = false;
          }},
 
+        // Data
+        {"--data", "PATH",
+         "Input data file.",
+         [](Config& c, const std::string& v) { c.dataFile = v; }, "data",
+         [](const Config& c) {
+             return c.dataFile;
+         }},
+
         // Reproducible frames
         {"--capture", "N",
          "Save frame N (counting from 0) as PNG and exit. Uses a fixed time step of 1/60 s unless --fixed-timestep is "

@@ -13,3 +13,5 @@
 
 # ImGUI
 imgui.ini
+# volume data sets (cmake/download_volumes.cmake), never commit them
+/data/

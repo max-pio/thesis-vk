@@ -32,6 +32,7 @@ set(FRAMEWORK_HEADERS
     core/results.hpp
     core/cpu_timer.hpp
     core/utils.hpp
+    core/volume.hpp
     core/gpu/gpu_timer.hpp
     core/gpu/gpu_utils.hpp
     core/gpu/vulkan_context.hpp
@@ -44,6 +45,7 @@ set(FRAMEWORK_SOURCES
     core/log.cpp
     core/results.cpp
     core/utils.cpp
+    core/volume.cpp
     core/gpu/gpu_timer.cpp
     core/gpu/gpu_utils.cpp
     core/gpu/vulkan_context.cpp
@@ -135,6 +137,27 @@ if(BUILD_SAMPLES)
         SHADERS_PATH="${CMAKE_CURRENT_SOURCE_DIR}/samples/fullscreen-quad/shader/")
     target_link_libraries(sample-fullscreen-quad PRIVATE framework)
     enable_warnings(sample-fullscreen-quad)
+
+    # loads a raw 3D volume (see README) and renders it with a ray marcher
+    set(VOLUME_SHADERS
+        samples/volume/shader/volume.vert
+        samples/volume/shader/volume.frag
+    )
+    add_executable(sample-volume
+        src/main.cpp samples/volume/renderer.hpp samples/volume/renderer.cpp ${VOLUME_SHADERS})
+    target_include_directories(sample-volume BEFORE PRIVATE samples/volume)
+    target_compile_definitions(sample-volume PRIVATE
+        SHADERS_PATH="${CMAKE_CURRENT_SOURCE_DIR}/samples/volume/shader/"
+        # the directory of the default volume files, see cmake/download_volumes.cmake
+        VOLUMES_PATH="${CMAKE_CURRENT_SOURCE_DIR}/data/volumes/")
+    target_link_libraries(sample-volume PRIVATE framework)
+    enable_warnings(sample-volume)
+
+    # cmake --build --preset debug --target download-volumes: downloads the default volume into data/volumes/. More
+    # volumes: cmake -DVOLUMES="neghip;foot" -P cmake/download_volumes.cmake
+    add_custom_target(download-volumes
+        COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/download_volumes.cmake
+        COMMENT "Downloading the default volume into data/volumes/")
 endif()
 
 # external dependencies and libraries ------------------------------------

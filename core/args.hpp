@@ -34,6 +34,11 @@ struct Config
     bool syncValidation = true;
 #endif
 
+    // Data
+    /// Input data file (--data). The renderer decides what it contains, e.g. a raw volume (see utils::loadVolume()) or
+    /// a mesh. "": the renderer's default.
+    std::string dataFile;
+
     // Reproducible frames, e.g. for screenshots in the thesis or for comparing two versions of the code
     /// Saves the frame with this number (counting from 0) as PNG to captureFile and exits. The default UINT32_MAX is
     /// never reached, so only --capture enables capturing.

@@ -3,12 +3,14 @@
 
 #pragma once
 
+#include "volume.hpp"
+
 #include <cstdint>
 #include <string>
 #include <vector>
 #include <vulkan/vulkan.h>
 
-/// Vulkan helper functions: error checking, shader compilation and pipeline barriers
+/// Vulkan helper functions: error checking, shader compilation, pipeline barriers and texture formats
 namespace utils {
 /// Implementation of VK_CHECK, use the macro instead.
 void vkCheck_(VkResult result, const char* call, const char* file, int line);
@@ -40,4 +42,13 @@ void imageBarrier(VkCommandBuffer cmd, VkImage image, VkImageAspectFlags aspect,
 /// Records a global memory barrier, e.g. between a compute shader writing a buffer and a draw call reading it.
 void memoryBarrier(VkCommandBuffer cmd, VkPipelineStageFlags2 srcStage, VkAccessFlags2 srcAccess,
                    VkPipelineStageFlags2 dstStage, VkAccessFlags2 dstAccess);
+
+/// The texture format for the voxels of a Volume, e.g. for VulkanContext::createTexture(VK_IMAGE_TYPE_3D, ..). The
+/// integer types are normalized, so a shader that samples the texture gets floats: uint8 -> R8_UNORM [0, 1],
+/// uint16 -> R16_UNORM [0, 1], int16 -> R16_SNORM [-1, 1], float32 -> R32_SFLOAT. float64 has no
+/// filterable format and returns VK_FORMAT_UNDEFINED; loadVolume() converts it to float32. (Like in OpenGL, texelFetch
+/// and texture() return the normalized value. Linear filtering of R32_SFLOAT is not required by Vulkan, but supported
+/// by all desktop GPUs.)
+VkFormat getVkFormat(VoxelType type);
+
 } // namespace utils

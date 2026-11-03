@@ -170,6 +170,7 @@ The default project renders instanced cubes with a GUI color and a texture on th
 * `core/gui.cpp`: sets up Dear ImGui and draws the GUI over the frame
 * `core/camera.cpp`: orbit camera; left mouse rotates, wheel zooms, WASD / QE move the center of rotation (horizontal / vertical)
 * `core/utils.cpp`: general helpers, e.g. saving PNGs and creating the cube texture on the CPU (OpenMP)
+* `core/volume.cpp`: loads raw 3D scalar volumes from disk (`utils::loadVolume()`, see [Volume Data](#volume-data))
 
 ## Samples
 
@@ -182,6 +183,51 @@ The default project renders instanced cubes with a GUI color and a texture on th
   * the GUI shows the G-buffer contents and the GPU time of each pass
 * `sample-fullscreen-quad` (`samples/fullscreen-quad/`): the smallest possible renderer, a fullscreen quad that shows its uv coordinates as color, tinted with a GUI color.
   * one pipeline that renders directly into the swapchain image, with a push constant and without buffers, descriptor sets or barriers: a minimal starting point for image-space techniques
+
+* `sample-volume` (`samples/volume/`): loads a raw 3D scalar volume from disk and renders it with a ray marcher in a fragment shader (see [Volume Data](#volume-data)).
+  * the volume is a 3D texture (`VK_IMAGE_TYPE_3D`) with a linear sampler; the ray is intersected with the bounding box and sampled in steps
+  * modes: direct volume rendering (emission-absorption, front-to-back compositing with early termination), maximum intensity projection and isosurface with gradient shading
+  * the GUI sets the value window, density, iso value, sampling rate and voxel spacing, and shows the GPU time
+
+## Volume Data
+
+Thesis topics in scientific visualization need real 3D scalar fields (CT, MRI, simulations). The framework reads **raw files** (the voxels without header, little-endian, x varies fastest) with `utils::loadVolume(path)` (`core/volume.hpp`). The grid size and the voxel type are part of the file name:
+
+* `name_WxHxD_type.raw`, e.g. `bonsai_256x256x256_uint8.raw`, with type `uint8`, `uint16`, `int16`, `float32` or `float64` (GPUs cannot filter 64 bit floats, so the loader converts `float64` to `float32` and logs a warning)
+* `name_WxHxD.raw`: the type is inferred from the file size (1 byte per voxel is `uint8`, 2 bytes `uint16`, 4 bytes `float32`, 8 bytes `float64`)
+
+The loader throws `std::runtime_error` with a readable message if the name or the file size does not fit. The result is a `Volume` with the voxels and the value range, which you upload with `VulkanContext::createTexture(VK_IMAGE_TYPE_3D, .., utils::getVkFormat(volume.type), ..)`. Integer voxels are normalized by the texture format (`uint8` to [0, 1], `int16` to [-1, 1], ..), so shaders sample floats; `Volume::minValue` / `maxValue` give the range in these units. The format has no voxel spacing: it is 1 after loading, set it yourself (see the table). `sample-volume` shows the whole path.
+
+**The volumes are not part of the repository.** Download them with the script that verifies the SHA-512 hash of each file from the web page of the collection, into `data/volumes/` (ignored by git):
+
+```
+cmake -P cmake/download_volumes.cmake                         # default: bonsai (16 MB)
+cmake -DVOLUMES="neghip;foot;carp" -P cmake/download_volumes.cmake
+cmake -DVOLUMES=list -P cmake/download_volumes.cmake          # lists all names
+./build-debug/sample-volume                                   # shows data/volumes/bonsai_256x256x256_uint8.raw
+./build-debug/sample-volume --volume data/volumes/carp_256x256x512_uint16.raw
+```
+
+The data sets come from the [Open SciVis Datasets](https://klacansky.com/open-scivis-datasets/) collection by Pavol Klacansky, which many recent papers use for their evaluation, so your results stay comparable. The collection has no single license; the data sets have different origins (e.g. volvis.org, hospitals, simulation groups). Check the acknowledgement of the data set on the web page and **cite it** (BibTeX is provided there) if you use it in your thesis. Volumes in the table can be downloaded by name with the script; all dimensions are `width x height x depth`.
+
+| Name | Size | Type | Spacing | File size | Used in |
+|---|---|---|---|---|---|
+| `neghip` | 64x64x64 | uint8 | 1x1x1 | 256 kB | tiny, for tests |
+| `bonsai` (default) | 256x256x256 | uint8 | 1x1x1 | 16 MB | classic CT, thin structures |
+| `foot`, `skull`, `aneurism` | 256x256x256 | uint8 | 1x1x1 | 16 MB each | Foot in the visibility optimization paper below |
+| `csafe_heptane` | 302x302x302 | uint8 | 1x1x1 | 26 MB | simulation, Heptane in the visibility optimization paper |
+| `mri_woman` | 256x256x109 | uint16 | 1x1x1.5 | 14 MB | MRI, only 12 bit of the 16 bit range are used |
+| `tacc_turbulence` | 256x256x256 | float32 | 1x1x1 | 64 MB | simulation, heavy-tailed values: narrow the window |
+| `carp` | 256x256x512 | uint16 | 0.78x0.39x1 | 64 MB | CT, anisotropic voxels |
+| `duct` | 193x194x1000 | float32 | 1x1x1 | 143 MB | simulation |
+| `bunny` | 512x512x361 | uint16 | 0.34x0.34x0.5 | 181 MB | CT |
+| `prone` | 512x512x463 | uint16 | 0.625x0.625x1 | 232 MB | CT (colon) |
+| `magnetic_reconnection` | 512x512x512 | float32 | 1x1x1 | 512 MB | simulation, in the visibility optimization paper |
+| `chameleon` | 1024x1024x1080 | uint16 | 0.092x0.092x0.105 | 2.1 GB | CT, in both papers below; the GPU needs the memory for the 3D texture |
+
+Volumes from the literature that you can compare with: Chameleon, Heptane, Foot and Magnetic Reconnection (Open SciVis names) are evaluation data sets of [View-Dependent Visibility Optimization for Monte Carlo Volume Visualization (Lerzer and Dachsbacher, Eurographics 2025)](https://cg.ivd.kit.edu/publications/2025/mc-visibility-opt/paper_mc-vis-opt.pdf); Chameleon is also used by [Real-Time Denoising of Volumetric Path Tracing for Direct Volume Rendering (Iglesias-Guitian et al.)](https://arxiv.org/pdf/2106.08034), which additionally uses Manix, Heloderma and Dragon (not part of the collection). `sample-volume` maps the x, y and z axes of the file to the world axes with +y up. Upright data sets like the bonsai look right, but CT and MRI scans are usually stored with the patient's long axis along z, so they appear rotated (`mri_woman` is seen from above): rotate the volume in your own renderer.
+
+Larger volumes of the collection (up to 256 GB) are listed on its web page; they need a streaming or bricked approach and are beyond what the loader (reads the whole file into memory) is meant for.
 
 ## Vulkan Concepts used in the Framework
 

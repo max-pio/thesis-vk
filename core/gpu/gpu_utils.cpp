@@ -175,3 +175,21 @@ void utils::memoryBarrier(VkCommandBuffer cmd, VkPipelineStageFlags2 srcStage, V
     };
     vkCmdPipelineBarrier2(cmd, &dependencyInfo);
 }
+
+VkFormat utils::getVkFormat(VoxelType type)
+{
+    switch (type)
+    {
+        case VoxelType::UInt8: return VK_FORMAT_R8_UNORM;
+        case VoxelType::UInt16: return VK_FORMAT_R16_UNORM;
+        case VoxelType::Int16: return VK_FORMAT_R16_SNORM;
+        case VoxelType::Float32: return VK_FORMAT_R32_SFLOAT;
+        case VoxelType::Float64:
+            // GPUs do not filter 64 bit floats. loadVolume() converts float64 to float32, so only a hand-made Volume
+            // gets here. VK_FORMAT_UNDEFINED would make image creation fail without any hint, so say why.
+            LOG_ERROR("getVkFormat: float64 has no Vulkan texture format, convert the data to float32 first.");
+            break;
+    }
+    // No default case above: the compiler warns (-Wswitch) when a new VoxelType has no format yet
+    return VK_FORMAT_UNDEFINED;
+}

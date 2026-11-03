@@ -17,21 +17,6 @@ The README and `CLAUDE.md` mention compute shaders and storage images, but no co
 - [ ] GPU timer for the dispatch, `--capture` and `--benchmark` work as in the other samples.
 - [ ] README "Samples" section and `CLAUDE.md` updated.
 
-## WP: Load 3D scalar volumes from disk
-
-Thesis topics in scientific visualization (e.g. volume rendering) need real data sets.
-
-- [ ] Search for good public scalar volume data sets that students can use: prefer the public evaluation data sets of
-      recent Vis and CG publications (IEEE VIS, EuroVis, Eurographics, ...), so that results are comparable to the
-      literature. Note size, data type, license, and download URL of each; pick a small default (fast download) and a
-      few larger ones. Candidate source to check first: the Open SciVis Datasets collection
-      (https://klacansky.com/open-scivis-datasets/), which many recent papers use.
-- [ ] Loader utility (e.g. `utils::loadVolume(..)`) compatible with the formats of the chosen data sets: at least raw
-      files (dimensions and data type from the file name or a small header file, e.g. `name_256x256x256_uint8.raw`),
-      with `uint8`, `uint16` and `float32` voxels, or `name_256x256x256.raw` with inferred `uint8/16/32` data type computed from file size. Upload with `createTexture(VK_IMAGE_TYPE_3D, ..)`.
-- [ ] No data committed to the repo! Optional: a CMake option or script to download the default data set into, e.g. into `data/volumes`.
-- [ ] Small sample that shows a loaded volume (e.g. a slice view or a simple ray marcher), plus README section.
-
 ## WP: Size window-sized resources by the swapchain extent (from the 2026-11-02 review)
 
 `main.cpp` passes `glfwGetFramebufferSize()` to the renderer (constructor and `resize()`), but the swapchain extent can
