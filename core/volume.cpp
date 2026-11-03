@@ -28,9 +28,7 @@ const char* voxelTypeName(VoxelType type)
         case VoxelType::Int16: return "int16";
         case VoxelType::Float32: return "float32";
         case VoxelType::Float64: return "float64";
-        default:
-            LOG_ERROR("Unknown VoxelType %i", static_cast<uint>(type));
-            break;
+        default: LOG_ERROR("Unknown VoxelType %i", static_cast<uint>(type)); break;
     }
     return "unknown";
 }
@@ -44,9 +42,7 @@ uint32_t voxelTypeSize(VoxelType type)
         case VoxelType::Int16: return 2;
         case VoxelType::Float32: return 4;
         case VoxelType::Float64: return 8;
-        default:
-            LOG_ERROR("Unknown VoxelType %i", static_cast<uint>(type));
-            break;
+        default: LOG_ERROR("Unknown VoxelType %i", static_cast<uint>(type)); break;
     }
     return 0;
 }

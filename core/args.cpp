@@ -136,9 +136,7 @@ const std::vector<Option>& getOptions()
          }},
 
         // Data
-        {"--data", "PATH",
-         "Input data file.",
-         [](Config& c, const std::string& v) { c.dataFile = v; }, "data",
+        {"--data", "PATH", "Input data file.", [](Config& c, const std::string& v) { c.dataFile = v; }, "data",
          [](const Config& c) {
              return c.dataFile;
          }},
